@@ -26,3 +26,23 @@ We use **Java 25 Records** for all domain models.
 ### Consequences
 * **Pros:** Immutability by default (thread-safe). Compact constructors for validation.
 * **Cons:** Cannot use JPA (Hibernate) lazy loading (not an issue since we use Redis).
+
+---
+
+## ADR-003: Adoption of ReactiveRedisTemplate & JSON Serialization
+
+### Status
+Accepted
+
+### Context
+I initially attempted to use `ReactiveCrudRepository` (the standard Spring Data interface). However, Spring Data Redis does not support reactive repositories for Redis (only blocking). This caused `InvalidDataAccessApiUsageException` at startup.
+
+Additionally, standard JSON serializers (`Jackson2JsonRedisSerializer`) are deprecated in Spring Data Redis 4.0 in favor of `RedisSerializer` API.
+
+### Decision
+1.  **Manual Repositories (no Interface):** Manually implement the Repository pattern using `ReactiveRedisTemplate`. This provides fine-grained control over serialization and atomic operations (CAS).
+2.  **Serialization:** We use `RedisSerializer.json()` instead of the deprecated classes.
+
+### Consequences
+* **Positive:** Full non-blocking I/O support. No compilation warnings.
+* **Negative:** Must write all code for `save`, `find`, and `delete` methods (no auto-generated queries).
