@@ -25,7 +25,7 @@ The Bidding Engine is a reactive microservice designed to handle concurrent bids
 ## 🏃‍♂️ Quick Start
 ```bash
 # 1. Start Infrastructure (Redis Stack)
-docker-compose up -d
+docker compose up -d
 
 # 2. Run Application
 ./mvnw spring-boot:run
