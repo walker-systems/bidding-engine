@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: bidding-engine
+
+  # 1. Redis Configuration (Reactive)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+
+  # 2. AI / OpenAI Configuration
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY} # Set in IntelliJ, not here
+      chat:
+        options:
+          model: gpt-3.5-turbo
+
+  # 3. WebFlux Config
+  main:
+    web-application-type: reactive
+
+# 4. Logging
+logging:
+  level:
+    root: INFO
+    com.walker.bidding: DEBUG
+    org.springframework.data.redis: INFO
