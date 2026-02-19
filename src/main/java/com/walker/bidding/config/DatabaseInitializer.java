@@ -15,6 +15,8 @@ import java.time.Instant;
 @Profile("!prod")
 @RequiredArgsConstructor
 @Slf4j
+
+// Simple class for testing database connection - will be replaced with comprehensive integration and unit testing.
 public class DatabaseInitializer implements CommandLineRunner {
 
     private final AuctionRepository auctionRepository;
