@@ -15,6 +15,8 @@ import java.time.Instant;
 @Profile("!prod")
 @RequiredArgsConstructor
 @Slf4j
+
+// Simple class for testing database connection - will be replaced with comprehensive integration and unit testing.
 public class DatabaseInitializer implements CommandLineRunner {
 
     private final AuctionRepository auctionRepository;
@@ -23,13 +25,14 @@ public class DatabaseInitializer implements CommandLineRunner {
     public void run(String... args) {
         log.info("🌱 Seeding database with test auction...");
 
-        Auction testAuction = new Auction(
-                "auction-1",
+        var testAuction = new Auction(
+                "auction-1",                        // ID of auction
                 "item-tesla-model-s",               // Item ID
                 new BigDecimal("100.00"),           // Current Price
                 "user-1",                           // High Bidder
                 Instant.now().plusSeconds(3600),    // Ends in 1 hr
-                true                                // Active
+                true,                               // Active
+                1                                   // Version
         );
 
         auctionRepository.save(testAuction)

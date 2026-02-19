@@ -14,7 +14,8 @@ public record Auction(
         BigDecimal currentPrice,
         String highBidder,
         Instant endsAt,
-        boolean active
+        boolean active,
+        int version // optimistic locking key
 ) {
     public Auction {
         if (id == null) {
