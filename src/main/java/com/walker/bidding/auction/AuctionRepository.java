@@ -31,20 +31,17 @@ public class AuctionRepository {
     // Atomically updates auction only if version matches.
     public Mono<Boolean> updateWithVersion(Auction newAuction) {
         String lua = """
-                local key = KEYS[1]
-                local newObjJson = ARGV[1]
+                local auctionKey = KEYS[1]
+                local proposedAuctionJson = ARGV[1]
                 
-                -- Get the current object as a JSON string
-                local currentJson = redis.call('GET', key)
-                if not currentJson then return false end
+                local databaseAuctionJson = redis.call('GET', auctionKey)
+                if not databaseAuctionJson then return false end
                 
-                -- Parse both JSON strings
-                local currentObj = cjson.decode(currentJson)
-                local newObj = cjson.decode(newObjJson)
+                local databaseAuction = cjson.decode(databaseAuctionJson)
+                local proposedAuction = cjson.decode(proposedAuctionJson)
                 
-                -- Optimistic lock: to save, current DB version must == (new version - 1)
-                if currentObj.version == (newObj.version - 1) then
-                    redis.call('SET', key, newObjJson)
+                if databaseAuction.version == (proposedAuction.version - 1) then
+                    redis.call('SET', auctionKey, proposedAuctionJson)
                     return true
                 else
                     return false

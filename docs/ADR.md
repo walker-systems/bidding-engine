@@ -31,9 +31,6 @@ We use **Java 25 Records** for all domain models.
 
 ## ADR-003: Adoption of ReactiveRedisTemplate & JSON Serialization
 
-### Status
-Accepted
-
 ### Context
 I initially attempted to use `ReactiveCrudRepository` (the standard Spring Data interface). However, Spring Data Redis does not support reactive repositories for Redis (only blocking). This caused `InvalidDataAccessApiUsageException` at startup.
 

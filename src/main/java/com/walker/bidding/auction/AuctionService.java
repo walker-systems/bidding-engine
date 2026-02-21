@@ -17,13 +17,14 @@ public class AuctionService {
 
     private final AuctionRepository auctionRepository;
 
+    public Mono<Auction> placeBid(String auctionId,
+                                  String bidder,
+                                  BigDecimal bidAmount) {
 
-    public Mono<Auction> placeBid(String auctionId, String bidder, BigDecimal bidAmount) {
         return auctionRepository.findById(auctionId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Auction not found: " + auctionId)))
-
-                // Begin stream
                 .flatMap(auction -> {
+
                     if (!auction.active()) {
                         return Mono.error(new IllegalStateException("Auction is closed."));
                     }
@@ -32,22 +33,21 @@ public class AuctionService {
                                 + auction.currentPrice()));
                     }
 
-                    // If above checks are passed, this auction will replace the old auction
-                    var newAuction = new Auction(
+                    Auction updatedAuction = new Auction(
                             auction.id(),
                             auction.itemId(),
-                            bidAmount,            // New price
-                            bidder,               // New highest bidder
+                            bidAmount,
+                            bidder,
                             auction.endsAt(),
-                            auction.active(),     // Always true - checked upstream
-                            auction.version() + 1 // **Increment version**
+                            true, // Active status already checked
+                            auction.version() + 1
                     );
 
-                    return auctionRepository.updateWithVersion(newAuction)
-                            .flatMap(success -> {
-                                if (success) {
+                    return auctionRepository.updateWithVersion(updatedAuction)
+                            .flatMap(bidSuccess -> {
+                                if (bidSuccess) {
                                     log.info("✅ Bid placed successfully by {} for ${}", bidder, bidAmount);
-                                    return Mono.just(newAuction);
+                                    return Mono.just(updatedAuction);
                                 } else {
                                     log.warn("⚠️ Collision detected for auction "
                                                 + "{}. Someone else bid at the exact same time!", auctionId);
@@ -56,7 +56,7 @@ public class AuctionService {
                             });
                 })
 
-                // Retry from the beginning (findById...) thrice in case of bid collision error
+                // Retry from the beginning (findById...) in case of bid collision error (3 additional attempts, then 409)
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(50))
                         .filter(throwable -> throwable instanceof ConcurrentModificationException)
                 );
