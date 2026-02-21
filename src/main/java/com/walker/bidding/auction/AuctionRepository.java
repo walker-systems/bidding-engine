@@ -29,16 +29,17 @@ public class AuctionRepository {
     }
 
     // Atomically updates auction only if version matches.
-    public Mono<Boolean> updateWithVersion(Auction newAuction) {
+    public Mono<Boolean> updateWithVersion(Auction proposedAuction) {
         String lua = """
-                local auctionKey = KEYS[1]
+                local proposedAuctionKey = KEYS[1]
                 local proposedAuctionJson = ARGV[1]
                 
-                local databaseAuctionJson = redis.call('GET', auctionKey)
+                local databaseAuctionJson = redis.call('GET', proposedAuctionKey)
                 if not databaseAuctionJson then return false end
                 
                 local databaseAuction = cjson.decode(databaseAuctionJson)
                 local proposedAuction = cjson.decode(proposedAuctionJson)
+                local auctionKey = proposedAuctionKey
                 
                 if databaseAuction.version == (proposedAuction.version - 1) then
                     redis.call('SET', auctionKey, proposedAuctionJson)
@@ -50,8 +51,8 @@ public class AuctionRepository {
 
         return template.execute(
                 RedisScript.of(lua, Boolean.class),
-                List.of(getKey(newAuction.id())), // KEYS[1]
-                List.of(newAuction) // ARGV[1]
+                List.of(getKey(proposedAuction.id())), // KEYS[1]
+                List.of(proposedAuction) // ARGV[1]
         ).next();
     }
 }
