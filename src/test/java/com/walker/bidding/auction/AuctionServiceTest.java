@@ -87,50 +87,52 @@ class AuctionServiceTest {
     @Test
     void placeBid_whenCollisionOccurs_shouldRetryAndSucceed() {
 
-        String auctionId = "testAuction";
-        Auction auctionStateA = new Auction(
+        String auctionId = "auctionId";
+        Auction originalAuction = new Auction(
                 auctionId,
                 "testItem",
                 new BigDecimal("100.00"),
-                "testUserA",
+                "originalUser",
                 Instant.now().plusSeconds(3600),
                 true,
                 1
         );
-        Auction auctionStateB = new Auction(
+
+        Auction updatedAuction = new Auction(
                 auctionId,
                 "testItem",
                 new BigDecimal("120.00"),
-                "testUserB",
+                "updatedBidUser",
                 Instant.now().plusSeconds(3600),
                 true,
                 2
         );
-        AtomicInteger attemptCount = new AtomicInteger(1);
+        AtomicInteger retryCount = new AtomicInteger(0);
 
         Mockito.when(auctionRepository.findById(auctionId))
                 .thenReturn(Mono.defer(() -> {
-                    if (attemptCount.getAndIncrement() == 1) {
-                        return Mono.just(auctionStateA);
+                    if (retryCount.getAndIncrement() == 0) {
+                        return Mono.just(originalAuction);
                     } else {
-                        return Mono.just(auctionStateB);
+                        return Mono.just(updatedAuction);
                     }
                 }));
         Mockito.when(auctionRepository.updateWithVersion(any(Auction.class)))
-                .thenReturn(Mono.just(false)) // State A -> False
-                .thenReturn(Mono.just(true)); // State B -> True
+                .thenReturn(Mono.just(false))
+                .thenReturn(Mono.just(true));
 
-        Mono<Auction> resultMono = auctionService.placeBid(
+
+        Mono<Auction> finalBidMono = auctionService.placeBid(
                 auctionId,
-                "testUserC",
+                "finalBidUser",
                 new BigDecimal("150.00")
         );
 
-        StepVerifier.create(resultMono)
-                .assertNext(auction -> {
-                    Assertions.assertEquals(new BigDecimal("150.00"), auction.currentPrice());
-                    Assertions.assertEquals("testUserC", auction.highBidder());
-                    Assertions.assertEquals(3, auction.version());
+        StepVerifier.create(finalBidMono)
+                .assertNext(finalAuction -> {
+                    Assertions.assertEquals(new BigDecimal("150.00"), finalAuction.currentPrice());
+                    Assertions.assertEquals("finalBidUser", finalAuction.highBidder());
+                    Assertions.assertEquals(3, finalAuction.version());
                 })
                 .verifyComplete();
     }
