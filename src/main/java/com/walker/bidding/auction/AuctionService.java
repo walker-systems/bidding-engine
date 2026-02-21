@@ -4,6 +4,7 @@ import com.walker.bidding.exception.ConcurrentBidException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -18,9 +19,7 @@ public class AuctionService {
 
     private final AuctionRepository auctionRepository;
 
-    public Mono<Auction> placeBid(String auctionId,
-                                  String bidder,
-                                  BigDecimal bidAmount) {
+    public Mono<Auction> placeBid(String auctionId, String bidder, BigDecimal bidAmount) {
 
         return auctionRepository.findById(auctionId)
                 .switchIfEmpty(Mono.error(new IllegalArgumentException("Auction not found: " + auctionId)))
@@ -48,7 +47,8 @@ public class AuctionService {
                             .flatMap(bidSuccess -> {
                                 if (bidSuccess) {
                                     log.info("✅ Bid placed successfully by {} for ${}", bidder, bidAmount);
-                                    return Mono.just(updatedAuction);
+                                    return auctionRepository.publishUpdate(updatedAuction)
+                                            .thenReturn(updatedAuction);
                                 } else {
                                     log.warn("⚠️ Collision detected for auction "
                                                 + "{}. Someone else bid at the exact same time!", auctionId);
@@ -61,5 +61,10 @@ public class AuctionService {
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(50))
                         .filter(throwable -> throwable instanceof ConcurrentBidException)
                 );
+    }
+
+    public Flux<Auction> streamAuctionUpdates(String auctionId) {
+        return auctionRepository.observeAuctionUpdates()
+                .filter(auction -> auction.id().equals(auctionId));
     }
 }
