@@ -2,7 +2,6 @@ package com.walker.bidding.auction;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.micrometer.observation.autoconfigure.ObservationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -14,7 +13,7 @@ import java.math.BigDecimal;
 @RequestMapping("/api/auctions")
 @RequiredArgsConstructor
 @Slf4j
-public class BiddingController {
+public class AuctionController {
 
     private final AuctionService auctionService;
 
