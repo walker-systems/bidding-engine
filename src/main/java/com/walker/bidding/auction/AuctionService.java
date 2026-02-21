@@ -1,5 +1,6 @@
 package com.walker.bidding.auction;
 
+import com.walker.bidding.exception.ConcurrentBidException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,21 +52,14 @@ public class AuctionService {
                                 } else {
                                     log.warn("⚠️ Collision detected for auction "
                                                 + "{}. Someone else bid at the exact same time!", auctionId);
-                                    return Mono.error(new ConcurrentModificationException("Bid collision"));
+                                    return Mono.error(new ConcurrentBidException("Bid collision"));
                                 }
                             });
                 })
 
                 // Retry from the beginning (findById...) in case of bid collision error (3 additional attempts, then 409)
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(50))
-                        .filter(throwable -> throwable instanceof ConcurrentModificationException)
+                        .filter(throwable -> throwable instanceof ConcurrentBidException)
                 );
-    }
-
-    // Temporary exception class
-    public static class ConcurrentModificationException extends RuntimeException {
-        public ConcurrentModificationException(String message) {
-            super(message);
-        }
     }
 }

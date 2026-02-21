@@ -25,14 +25,6 @@ public class AuctionController {
                                   @RequestBody BidRequest request) {
         log.info("Received HTTP POST to place bid on auction {} for ${}", id, request.amount());
 
-        return auctionService.placeBid(id, request.bidder(), request.amount())
-                // TODO: Error handling will be replaced with global exception handler
-                .onErrorMap(IllegalArgumentException.class, e ->
-                        new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()))
-                .onErrorMap(IllegalStateException.class, e ->
-                        new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage()))
-                .onErrorMap(AuctionService.ConcurrentModificationException.class, e ->
-                        new ResponseStatusException(HttpStatus.CONFLICT, "High traffic. Please try again."));
-
+        return auctionService.placeBid(id, request.bidder(), request.amount());
     }
 }
