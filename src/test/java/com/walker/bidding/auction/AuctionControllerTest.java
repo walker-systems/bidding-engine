@@ -1,5 +1,6 @@
 package com.walker.bidding.auction;
 
+import com.walker.bidding.exception.ConcurrentBidException;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +63,7 @@ class AuctionControllerTest {
         var bidAmount = new BigDecimal("150.00");
 
         Mockito.when(auctionService.placeBid(eq(auctionId), eq("unluckyUser"), eq(bidAmount)))
-                .thenReturn(Mono.error(new AuctionService.ConcurrentModificationException("Bid collision")));
+                .thenReturn(Mono.error(new ConcurrentBidException("Bid collision")));
 
         webTestClient.post()
                 .uri("/api/auctions/{id}/bids", auctionId)
