@@ -1,9 +1,12 @@
 package com.walker.bidding.auction;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.connection.ReactiveSubscription.Message;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -54,5 +57,14 @@ public class AuctionRepository {
                 List.of(getKey(proposedAuction.id())), // KEYS[1]
                 List.of(proposedAuction) // ARGV[1]
         ).next();
+    }
+
+    public Mono<Long> publishUpdate(Auction auction) {
+        return template.convertAndSend("auction:updates", auction);
+    }
+
+    public Flux<Auction> observeAuctionUpdates() {
+        return template.listenTo(ChannelTopic.of("auction:updates"))
+                .map(Message::getMessage);
     }
 }
