@@ -2,75 +2,106 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reactive Bidding Engine</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; background: #f4f7f6; }
-        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 350px; }
-        .price { font-size: 2.5rem; color: #2ecc71; font-weight: bold; margin: 10px 0; }
-        .bidder { color: #7f8c8d; margin-bottom: 20px; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #2980b9; }
-        #status { font-size: 0.8rem; margin-top: 10px; color: #e74c3c; }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100 p-8 font-sans">
 
-<div class="card">
-    <h2 id="item-name">Loading Auction...</h2>
-    <div class="price">$<span id="current-price">0.00</span></div>
-    <div class="bidder">Highest Bidder: <span id="high-bidder">None</span></div>
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Live Storefront</h1>
+    <p class="text-gray-600 mb-8">Powered by Spring WebFlux & Redis</p>
 
-    <input type="text" id="user-name" placeholder="Your Name">
-    <input type="number" id="bid-amount" placeholder="Bid Amount">
-    <button onclick="placeBid()">Place Bid</button>
-    <p id="status"></p>
+    <div id="auction-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    </div>
 </div>
 
 <script>
-    const auctionId = 'auction-1'; // Matches your database seed ID
-    const statusEl = document.getElementById('status');
+    // 1. Fetch all auctions on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        fetch('/api/auctions')
+            .then(response => response.json())
+            .then(auctions => {
+                const grid = document.getElementById('auction-grid');
+                grid.innerHTML = ''; // Clear loading state
 
-    // 1. Setup SSE Listener
-    const eventSource = new EventSource(`/api/auctions/${auctionId}/stream`);
+                auctions.forEach(auction => {
+                    createAuctionCard(auction, grid);
+                    connectToLiveStream(auction.id);
+                });
+            })
+            .catch(err => console.error("Error fetching storefront:", err));
+    });
 
-    eventSource.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        document.getElementById('item-name').innerText = data.itemId;
-        document.getElementById('current-price').innerText = data.currentPrice.toFixed(2);
-        document.getElementById('high-bidder').innerText = data.highBidder || 'None';
-        statusEl.innerText = ""; // Clear errors on success
-    };
+    // 2. Dynamically build the HTML for an item card
+    function createAuctionCard(auction, container) {
+        const card = document.createElement('div');
+        card.className = "bg-white p-6 rounded-xl shadow-md border border-gray-200 transition transform hover:-translate-y-1";
+        card.id = `card-${auction.id}`;
 
-    eventSource.onerror = () => {
-        statusEl.innerText = "Connection lost. Reconnecting...";
-    };
+        card.innerHTML = `
+                <h2 class="text-xl font-bold text-gray-800 mb-2">${auction.itemId}</h2>
+                <div class="text-3xl font-black text-green-500 mb-2" id="price-${auction.id}">
+                    $${auction.currentPrice.toFixed(2)}
+                </div>
+                <p class="text-sm text-gray-500 mb-4">
+                    Highest Bidder: <span id="bidder-${auction.id}" class="font-semibold text-gray-700">${auction.highBidder}</span>
+                </p>
 
-    // 2. Place Bid Function
-    async function placeBid() {
-        const bidder = document.getElementById('user-name').value;
-        const amount = document.getElementById('bid-amount').value;
+                <div class="flex space-x-2">
+                    <input type="text" id="username-${auction.id}" placeholder="Username" class="w-1/2 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="demo_user">
+                    <input type="number" id="bid-amount-${auction.id}" placeholder="$$$" class="w-1/4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${auction.currentPrice + 10}">
+                    <button onclick="placeBid('${auction.id}')" class="w-1/4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">
+                        Bid
+                    </button>
+                </div>
+                <p id="error-${auction.id}" class="text-red-500 text-xs mt-2 hidden"></p>
+            `;
+        container.appendChild(card);
+    }
 
-        if (!bidder || !amount) {
-            statusEl.innerText = "Enter name and amount!";
-            return;
-        }
+    // 3. Connect to the Server-Sent Events stream for LIVE updates
+    function connectToLiveStream(auctionId) {
+        const eventSource = new EventSource(`/api/auctions/${auctionId}/stream`);
 
-        try {
-            const response = await fetch(`/api/auctions/${auctionId}/bids`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bidder, amount: parseFloat(amount) })
+        eventSource.onmessage = function(event) {
+            const updatedAuction = JSON.parse(event.data);
+
+            // Flash the price green to show live activity
+            const priceElement = document.getElementById(`price-${auctionId}`);
+            priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
+            priceElement.classList.add('animate-pulse');
+            setTimeout(() => priceElement.classList.remove('animate-pulse'), 500);
+
+            // Update bidder and next suggested bid
+            document.getElementById(`bidder-${auctionId}`).innerText = updatedAuction.highBidder;
+            document.getElementById(`bid-amount-${auctionId}`).value = updatedAuction.currentPrice + 10;
+            document.getElementById(`error-${auctionId}`).classList.add('hidden');
+        };
+    }
+
+    // 4. Send the POST request when user clicks Bid
+    function placeBid(auctionId) {
+        const username = document.getElementById(`username-${auctionId}`).value;
+        const amount = document.getElementById(`bid-amount-${auctionId}`).value;
+        const errorText = document.getElementById(`error-${auctionId}`);
+
+        fetch(`/api/auctions/${auctionId}/bids`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bidder: username, amount: amount })
+        })
+            .then(async response => {
+                if (!response.ok) {
+                    const error = await response.json();
+                    errorText.innerText = error.detail || "Error placing bid";
+                    errorText.classList.remove('hidden');
+                }
+            })
+            .catch(err => {
+                errorText.innerText = "Network error";
+                errorText.classList.remove('hidden');
             });
-
-            if (response.status === 409) {
-                statusEl.innerText = "Conflict! Someone beat you to it. Try again.";
-            } else if (!response.ok) {
-                statusEl.innerText = "Error placing bid.";
-            }
-        } catch (err) {
-            statusEl.innerText = "Server unreachable.";
-        }
     }
 </script>
 </body>

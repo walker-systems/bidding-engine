@@ -67,4 +67,8 @@ public class AuctionService {
         return auctionRepository.observeAuctionUpdates()
                 .filter(auction -> auction.id().equals(auctionId));
     }
+
+    public Flux<Auction> getAllAuctions() {
+        return auctionRepository.findAll();
+    }
 }
