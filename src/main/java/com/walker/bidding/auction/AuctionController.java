@@ -35,4 +35,10 @@ public class AuctionController {
         log.info("Client connected to live stream for auction {}", id);
         return auctionService.streamAuctionUpdates(id);
     }
+
+    @GetMapping
+    public Flux<Auction> getAllAuctions() {
+        log.info("Fetching all active auctions for storefront");
+        return auctionService.getAllAuctions();
+    }
 }

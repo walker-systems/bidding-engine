@@ -67,4 +67,10 @@ public class AuctionRepository {
         return template.listenTo(ChannelTopic.of("auction:updates"))
                 .map(Message::getMessage);
     }
+
+    public Flux<Auction> findAll() {
+        // Find all keys starting with "auctions:", then fetch the value for each key
+        return template.keys("auctions:*")
+                .flatMap(key -> template.opsForValue().get(key));
+    }
 }
