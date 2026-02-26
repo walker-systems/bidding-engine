@@ -2,7 +2,7 @@ spring:
   application:
     name: bidding-engine
 
-  # 1. Redis Configuration (Reactive)
+  # 1. Redis Configuration
   data:
     redis:
       host: localhost
@@ -12,7 +12,7 @@ spring:
   # 2. AI / OpenAI Configuration
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY} # Set in IntelliJ, not here
+      api-key: ${OPENAI_API_KEY}
       chat:
         options:
           model: gpt-3.5-turbo

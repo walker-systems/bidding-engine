@@ -1,8 +1,10 @@
 package com.walker.bidding.auction;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -26,34 +28,30 @@ class AuctionServiceTest {
     @InjectMocks
     private AuctionService auctionService;
 
+    @BeforeEach
+    void setUp() {
+        Mockito.lenient().when(auctionRepository.publishUpdate(any(Auction.class)))
+                .thenReturn(Mono.just(1L));
+    }
+
     @Test
     void placeBid_whenValid_shouldUpdateAndReturnNewAuction() {
-
         String auctionId = "testAuction";
         Auction auction = new Auction(
-                auctionId,
-                "testItem",
-                new BigDecimal("100.00"),
-                "testUserA",
-                Instant.now().plusSeconds(3600),
-                true,
-                1
+                auctionId, "testItem", new BigDecimal("100.00"),
+                "testUserA", Instant.now().plusSeconds(3600), true, 1
         );
 
         Mockito.when(auctionRepository.findById(auctionId)).thenReturn(Mono.just(auction));
         Mockito.when(auctionRepository.updateWithVersion(any(Auction.class))).thenReturn(Mono.just(true));
 
-        Mono<Auction> validBidMono = auctionService.placeBid(
-                auctionId,
-                "testUserB",
-                new BigDecimal("115.00")
-        );
+        Mono<Auction> validBidMono = auctionService.placeBid(auctionId, "testUserB", new BigDecimal("115.00"));
 
         StepVerifier.create(validBidMono)
                 .assertNext(updatedAuction -> {
-                    assert updatedAuction.currentPrice().equals(new BigDecimal("115.00"));
-                    assert updatedAuction.highBidder().equals("testUserB");
-                    assert updatedAuction.version() == 2;
+                    Assertions.assertEquals(new BigDecimal("115.00"), updatedAuction.currentPrice());
+                    Assertions.assertEquals("testUserB", updatedAuction.highBidder());
+                    Assertions.assertEquals(2, updatedAuction.version());
                 })
                 .verifyComplete();
     }
@@ -63,25 +61,15 @@ class AuctionServiceTest {
 
         String auctionId = "testAuction";
         Auction auction = new Auction(
-                auctionId,
-                "testItem",
-                new BigDecimal("100.00"),
-                "testUserA",
-                Instant.now().plusSeconds(3600),
-                true,
-                1
+                auctionId, "testItem", new BigDecimal("100.00"),
+                "testUserA", Instant.now().plusSeconds(3600), true, 1
         );
 
         Mockito.when(auctionRepository.findById(auctionId)).thenReturn(Mono.just(auction));
 
-        Mono<Auction> lowBidMono = auctionService.placeBid(
-                auctionId,
-                "testUserB",
-                new BigDecimal("50.00")
-        );
+        Mono<Auction> lowBidMono = auctionService.placeBid(auctionId, "testUserB", new BigDecimal("50.00"));
 
-        StepVerifier.create(lowBidMono)
-                .verifyError(IllegalArgumentException.class);
+        StepVerifier.create(lowBidMono).verifyError(IllegalArgumentException.class);
     }
 
     @Test
@@ -89,23 +77,14 @@ class AuctionServiceTest {
 
         String auctionId = "testAuction";
         Auction stateA = new Auction(
-                auctionId,
-                "testItem",
-                new BigDecimal("100.00"),
-                "testUserA",
-                Instant.now().plusSeconds(3600),
-                true,
-                1
+                auctionId, "testItem", new BigDecimal("100.00"),
+                "testUserA", Instant.now().plusSeconds(3600), true, 1
         );
 
         Auction stateB = new Auction(
-                auctionId,
-                "testItem",
-                new BigDecimal("110.00"),
-                "testUserB",
-                Instant.now().plusSeconds(3600),
-                true,
-                2
+                auctionId, "testItem",
+                new BigDecimal("110.00"), "testUserB",
+                Instant.now().plusSeconds(3600), true, 2
         );
         AtomicInteger retryCount = new AtomicInteger(0);
 
@@ -120,7 +99,6 @@ class AuctionServiceTest {
         Mockito.when(auctionRepository.updateWithVersion(any(Auction.class)))
                 .thenReturn(Mono.just(false))
                 .thenReturn(Mono.just(true));
-
 
         Mono<Auction> finalBidUserCMono = auctionService.placeBid(
                 auctionId,

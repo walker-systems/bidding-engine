@@ -17,7 +17,8 @@
 </div>
 
 <script>
-    // 1. Fetch all auctions on page load
+    const activeAuctions = {};
+
     document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/auctions')
             .then(response => response.json())
@@ -27,31 +28,46 @@
 
                 auctions.forEach(auction => {
                     createAuctionCard(auction, grid);
+
+                    activeAuctions[auction.id] = {
+                        endsAt: new Date(auction.endsAt).getTime(),
+                        timerEl: document.getElementById(`timer-${auction.id}`),
+                        btnEl: document.getElementById(`btn-${auction.id}`),
+                        usernameEl: document.getElementById(`username-${auction.id}`),
+                        amountEl: document.getElementById(`bid-amount-${auction.id}`)
+                    };
+
                     connectToLiveStream(auction.id);
                 });
+
+                requestAnimationFrame(updateClocks);
             })
             .catch(err => console.error("Error fetching storefront:", err));
     });
 
-    // 2. Dynamically build the HTML for an item card
     function createAuctionCard(auction, container) {
         const card = document.createElement('div');
-        card.className = "bg-white p-6 rounded-xl shadow-md border border-gray-200 transition transform hover:-translate-y-1";
+        card.className = "bg-white p-6 rounded-xl shadow-md border border-gray-200 transition transform hover:-translate-y-1 flex flex-col";
         card.id = `card-${auction.id}`;
 
         card.innerHTML = `
-                <h2 class="text-xl font-bold text-gray-800 mb-2">${auction.itemId}</h2>
-                <div class="text-3xl font-black text-green-500 mb-2" id="price-${auction.id}">
-                    $${auction.currentPrice.toFixed(2)}
+                <div class="flex-grow">
+                    <h2 class="text-xl font-bold text-gray-800 mb-2">${auction.itemId}</h2>
+                    <div class="text-3xl font-black text-green-500 mb-2" id="price-${auction.id}">
+                        $${auction.currentPrice.toFixed(2)}
+                    </div>
+                    <div id="timer-${auction.id}" class="text-sm font-bold text-gray-600 mb-4 transition-colors duration-300">
+                        Time Left: Loading...
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">
+                        Highest Bidder: <span id="bidder-${auction.id}" class="font-semibold text-gray-700">${auction.highBidder}</span>
+                    </p>
                 </div>
-                <p class="text-sm text-gray-500 mb-4">
-                    Highest Bidder: <span id="bidder-${auction.id}" class="font-semibold text-gray-700">${auction.highBidder}</span>
-                </p>
 
-                <div class="flex space-x-2">
+                <div class="flex space-x-2 mt-auto">
                     <input type="text" id="username-${auction.id}" placeholder="Username" class="w-1/2 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="demo_user">
                     <input type="number" id="bid-amount-${auction.id}" placeholder="$$$" class="w-1/4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" value="${auction.currentPrice + 10}">
-                    <button onclick="placeBid('${auction.id}')" class="w-1/4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">
+                    <button id="btn-${auction.id}" onclick="placeBid('${auction.id}')" class="w-1/4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition">
                         Bid
                     </button>
                 </div>
@@ -60,27 +76,34 @@
         container.appendChild(card);
     }
 
-    // 3. Connect to the Server-Sent Events stream for LIVE updates
     function connectToLiveStream(auctionId) {
         const eventSource = new EventSource(`/api/auctions/${auctionId}/stream`);
 
         eventSource.onmessage = function(event) {
             const updatedAuction = JSON.parse(event.data);
 
-            // Flash the price green to show live activity
-            const priceElement = document.getElementById(`price-${auctionId}`);
-            priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
-            priceElement.classList.add('animate-pulse');
-            setTimeout(() => priceElement.classList.remove('animate-pulse'), 500);
+            if (activeAuctions[updatedAuction.id]) {
+                activeAuctions[updatedAuction.id].endsAt = new Date(updatedAuction.endsAt).getTime();
+            }
 
-            // Update bidder and next suggested bid
-            document.getElementById(`bidder-${auctionId}`).innerText = updatedAuction.highBidder;
-            document.getElementById(`bid-amount-${auctionId}`).value = updatedAuction.currentPrice + 10;
-            document.getElementById(`error-${auctionId}`).classList.add('hidden');
+            const priceElement = document.getElementById(`price-${auctionId}`);
+            if (priceElement) {
+                priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
+                priceElement.classList.add('animate-pulse');
+                setTimeout(() => priceElement.classList.remove('animate-pulse'), 500);
+            }
+
+            const bidderElement = document.getElementById(`bidder-${auctionId}`);
+            if (bidderElement) bidderElement.innerText = updatedAuction.highBidder;
+
+            const bidInput = document.getElementById(`bid-amount-${auctionId}`);
+            if(bidInput) bidInput.value = updatedAuction.currentPrice + 10;
+
+            const errorText = document.getElementById(`error-${auctionId}`);
+            if(errorText) errorText.classList.add('hidden');
         };
     }
 
-    // 4. Send the POST request when user clicks Bid
     function placeBid(auctionId) {
         const username = document.getElementById(`username-${auctionId}`).value;
         const amount = document.getElementById(`bid-amount-${auctionId}`).value;
@@ -102,6 +125,55 @@
                 errorText.innerText = "Network error";
                 errorText.classList.remove('hidden');
             });
+    }
+
+    let lastTick = 0;
+
+    function updateClocks(timestamp) {
+        if (timestamp - lastTick >= 1000) {
+            const now = Date.now();
+
+            for (const [id, data] of Object.entries(activeAuctions)) {
+                const { endsAt, timerEl, btnEl, usernameEl, amountEl } = data;
+
+                if (!timerEl) continue;
+
+                const diff = endsAt - now;
+
+                if (diff <= 0) {
+                    timerEl.innerText = "SOLD!";
+                    timerEl.className = "text-xl font-black text-red-600 mb-4 tracking-widest";
+
+                    if (btnEl && !btnEl.disabled) {
+                        btnEl.disabled = true;
+                        btnEl.innerText = "Closed";
+                        btnEl.className = "w-1/4 bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-not-allowed";
+
+                        usernameEl.disabled = true;
+                        usernameEl.className = "w-1/2 px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed";
+
+                        amountEl.disabled = true;
+                        amountEl.className = "w-1/4 px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed";
+                    }
+
+                    delete activeAuctions[id];
+                } else {
+                    const seconds = Math.floor((diff / 1000) % 60);
+                    const minutes = Math.floor((diff / 1000 / 60) % 60);
+
+                    if (diff < 15000) { // < 15 seconds
+                        timerEl.innerText = `⏳ Deal closing soon: 0${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        timerEl.classList.add("text-red-500");
+                    } else {
+                        timerEl.innerText = `Time Left: 0${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        timerEl.classList.remove("text-red-500");
+                    }
+                }
+            }
+            lastTick = timestamp;
+        }
+
+        requestAnimationFrame(updateClocks);
     }
 </script>
 </body>

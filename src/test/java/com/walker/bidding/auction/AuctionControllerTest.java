@@ -27,7 +27,7 @@ class AuctionControllerTest {
     void placeBid_whenValid_shouldReturn200Ok() {
 
         String auctionId = "test-1";
-        var bidAmount = new BigDecimal("150.00");
+        BigDecimal bidAmount = new BigDecimal("150.00");
         Auction updatedAuction = new Auction(
                 auctionId,
                 "item-1",
@@ -60,7 +60,7 @@ class AuctionControllerTest {
     @Test
     void placeBid_whenCollisionOccurs_shouldReturn409Conflict() {
         String auctionId = "test-1";
-        var bidAmount = new BigDecimal("150.00");
+        BigDecimal bidAmount = new BigDecimal("150.00");
 
         Mockito.when(auctionService.placeBid(eq(auctionId), eq("unluckyUser"), eq(bidAmount)))
                 .thenReturn(Mono.error(new ConcurrentBidException("Bid collision")));
