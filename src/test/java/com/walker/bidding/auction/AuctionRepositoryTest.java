@@ -26,7 +26,7 @@ public class AuctionRepositoryTest {
     private AuctionRepository auctionRepository;
 
     @Test
-    void updateWithVersion_whenVersionsMatch_shouldUpdateAndReturnTrue() {
+    void updateWithVersion_whenNewVersionGreaterByOne_shouldUpdateAndReturnTrue() {
         Auction startingAuction = new Auction(
                 "test-1",
                 "item-1",
@@ -46,7 +46,7 @@ public class AuctionRepositoryTest {
                 "user2",
                 startingAuction.endsAt(),
                 true,
-                2
+                2 // proposedAuction.version - 1 == startingAuction.version
         );
 
         StepVerifier.create(auctionRepository.updateWithVersion(proposedAuction))
@@ -55,7 +55,7 @@ public class AuctionRepositoryTest {
     }
 
     @Test
-    void updateWithVersion_whenVersionsDoNotMatch_shouldRejectAndReturnFalse() {
+    void updateWithVersion_whenNewVersionNotGreaterByOne_shouldRejectAndReturnFalse() {
         Auction startingAuction = new Auction(
                 "test-2",
                 "item-2",
@@ -75,7 +75,7 @@ public class AuctionRepositoryTest {
                 "sneakyUser",
                 startingAuction.endsAt(),
                 true,
-                6
+                6 // version too large
         );
 
         StepVerifier.create(auctionRepository.updateWithVersion(proposedAuction))

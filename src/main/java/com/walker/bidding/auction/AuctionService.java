@@ -39,7 +39,7 @@ public class AuctionService {
                             bidAmount,
                             bidder,
                             auction.endsAt(),
-                            true, // Active status already checked
+                            auction.active(),
                             auction.version() + 1
                     );
 
@@ -57,7 +57,7 @@ public class AuctionService {
                             });
                 })
 
-                // Retry from the beginning (findById...) in case of bid collision error (3 additional attempts, then 409)
+                // Retry from the beginning (findById...) in case of bid collision error (3 additional tries, then 409)
                 .retryWhen(Retry.backoff(3, Duration.ofMillis(50))
                         .filter(throwable -> throwable instanceof ConcurrentBidException)
                 );
