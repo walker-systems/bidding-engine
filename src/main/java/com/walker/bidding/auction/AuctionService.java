@@ -71,4 +71,31 @@ public class AuctionService {
     public Flux<Auction> getAllAuctions() {
         return auctionRepository.findAll();
     }
+
+    public Mono<Void> revertFraudulentBid(String auctionId, String fraudulentUser) {
+        return auctionRepository.findById(auctionId)
+                .flatMap(auction -> {
+                    if (fraudulentUser.equals(auction.highBidder())) {
+                        log.warn("⏪ Reverting fraudulent bid on {} by {}", auctionId, fraudulentUser);
+
+                        BigDecimal revertedPrice = auction.currentPrice().subtract(new BigDecimal("10.00"));
+
+                        Auction revertedAuction = new Auction(
+                                auction.id(),
+                                auction.itemId(),
+                                revertedPrice,
+                                "System", // Reset to default
+                                auction.endsAt(),
+                                auction.active(),
+                                auction.version() + 1 // Increment version so the update succeeds
+                        );
+
+                        // Save the fix, then publish the update so the UI flashes
+                        return auctionRepository.updateWithVersion(revertedAuction)
+                                .filter(Boolean::booleanValue)
+                                .flatMap(success -> auctionRepository.publishUpdate(revertedAuction));
+                    }
+                    return Mono.empty();
+                }).then();
+    }
 }

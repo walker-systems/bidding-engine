@@ -24,13 +24,14 @@
             .then(response => response.json())
             .then(auctions => {
                 const grid = document.getElementById('auction-grid');
-                grid.innerHTML = ''; // Clear loading state
+                grid.innerHTML = '';
 
                 auctions.forEach(auction => {
                     createAuctionCard(auction, grid);
 
                     activeAuctions[auction.id] = {
                         endsAt: new Date(auction.endsAt).getTime(),
+                        currentPrice: auction.currentPrice,
                         timerEl: document.getElementById(`timer-${auction.id}`),
                         btnEl: document.getElementById(`btn-${auction.id}`),
                         usernameEl: document.getElementById(`username-${auction.id}`),
@@ -47,20 +48,24 @@
 
     function createAuctionCard(auction, container) {
         const card = document.createElement('div');
-        card.className = "bg-white p-6 rounded-xl shadow-md border border-gray-200 transition transform hover:-translate-y-1 flex flex-col";
+        // Added smooth transition for the yellow halo
+        card.className = "bg-white p-6 rounded-xl shadow-md border border-gray-200 transition-all duration-500 transform hover:-translate-y-1 flex flex-col";
         card.id = `card-${auction.id}`;
 
         card.innerHTML = `
                 <div class="flex-grow">
                     <h2 class="text-xl font-bold text-gray-800 mb-2">${auction.itemId}</h2>
-                    <div class="text-3xl font-black text-green-500 mb-2" id="price-${auction.id}">
+
+                    <div class="text-3xl font-black text-green-500 transition-all duration-500 opacity-100 mb-2" id="price-${auction.id}">
                         $${auction.currentPrice.toFixed(2)}
                     </div>
-                    <div id="timer-${auction.id}" class="text-sm font-bold text-gray-600 mb-4 transition-colors duration-300">
+
+                    <div id="timer-${auction.id}" class="text-sm font-bold text-gray-600 mb-4 transition-colors duration-500">
                         Time Left: Loading...
                     </div>
+
                     <p class="text-sm text-gray-500 mb-4">
-                        Highest Bidder: <span id="bidder-${auction.id}" class="font-semibold text-gray-700">${auction.highBidder}</span>
+                        Highest Bidder: <span id="bidder-${auction.id}" class="font-semibold text-gray-700 transition-all duration-500 opacity-100">${auction.highBidder}</span>
                     </p>
                 </div>
 
@@ -81,23 +86,95 @@
 
         eventSource.onmessage = function(event) {
             const updatedAuction = JSON.parse(event.data);
+            const auctionState = activeAuctions[updatedAuction.id];
 
-            if (activeAuctions[updatedAuction.id]) {
-                activeAuctions[updatedAuction.id].endsAt = new Date(updatedAuction.endsAt).getTime();
-            }
-
+            const cardElement = document.getElementById(`card-${auctionId}`);
             const priceElement = document.getElementById(`price-${auctionId}`);
-            if (priceElement) {
-                priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
-                priceElement.classList.add('animate-pulse');
-                setTimeout(() => priceElement.classList.remove('animate-pulse'), 500);
+            const bidderElement = document.getElementById(`bidder-${auctionId}`);
+            const currentUser = document.getElementById(`username-${auctionId}`).value.trim();
+
+            if (!auctionState || !priceElement || !bidderElement) return;
+
+            // 1. YELLOW HALO LOGIC
+            if (cardElement) {
+                if (updatedAuction.highBidder === currentUser && currentUser !== "") {
+                    cardElement.classList.add('ring-4', 'ring-yellow-400', 'border-transparent');
+                } else {
+                    // This automatically removes the halo when Sentinel reverts to "System"
+                    cardElement.classList.remove('ring-4', 'ring-yellow-400', 'border-transparent');
+                }
             }
 
-            const bidderElement = document.getElementById(`bidder-${auctionId}`);
-            if (bidderElement) bidderElement.innerText = updatedAuction.highBidder;
+            auctionState.endsAt = new Date(updatedAuction.endsAt).getTime();
 
-            const bidInput = document.getElementById(`bid-amount-${auctionId}`);
-            if(bidInput) bidInput.value = updatedAuction.currentPrice + 10;
+            // 2. DETECT ROLLBACK (Green -> Fade -> Red -> Fade -> Green)
+            if (updatedAuction.currentPrice < auctionState.currentPrice) {
+                showFraudToast(`Fraudulent activity detected. Price reverted!`);
+
+                const bidInput = document.getElementById(`bid-amount-${auctionId}`);
+                if (bidInput) bidInput.value = updatedAuction.currentPrice + 10;
+
+                // Step A: Fade Out Completely
+                priceElement.classList.add('opacity-0');
+                bidderElement.classList.add('opacity-0');
+
+                // Step B: Wait 400ms for fade out, then swap to RED and fade in
+                setTimeout(() => {
+                    priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
+                    priceElement.classList.remove('text-green-500');
+                    priceElement.classList.add('text-red-600');
+                    priceElement.classList.remove('opacity-0');
+
+                    bidderElement.innerText = updatedAuction.highBidder;
+                    bidderElement.classList.remove('text-gray-700');
+                    bidderElement.classList.add('text-red-600');
+                    bidderElement.classList.remove('opacity-0');
+
+                    // Step C: Wait 2 seconds so user reads the Red text, then fade out again
+                    setTimeout(() => {
+                        priceElement.classList.add('opacity-0');
+                        bidderElement.classList.add('opacity-0');
+
+                        // Step D: Wait 400ms, swap back to Green/Gray, fade in
+                        setTimeout(() => {
+                            priceElement.classList.remove('text-red-600');
+                            priceElement.classList.add('text-green-500');
+                            priceElement.classList.remove('opacity-0');
+
+                            bidderElement.classList.remove('text-red-600');
+                            bidderElement.classList.add('text-gray-700');
+                            bidderElement.classList.remove('opacity-0');
+                        }, 400);
+
+                    }, 2000);
+
+                }, 400);
+
+            }
+            // 3. NORMAL BID UPDATE (Green -> Fade -> Green)
+            else if (updatedAuction.currentPrice > auctionState.currentPrice) {
+
+                if (updatedAuction.highBidder !== "System") {
+                    const bidInput = document.getElementById(`bid-amount-${auctionId}`);
+                    if(bidInput) bidInput.value = updatedAuction.currentPrice + 10;
+                }
+
+                // Step A: Fade out current text
+                priceElement.classList.add('opacity-0');
+                bidderElement.classList.add('opacity-0');
+
+                // Step B: Wait 400ms, update text, fade back in
+                setTimeout(() => {
+                    priceElement.innerText = `$${updatedAuction.currentPrice.toFixed(2)}`;
+                    bidderElement.innerText = updatedAuction.highBidder;
+
+                    priceElement.classList.remove('opacity-0');
+                    bidderElement.classList.remove('opacity-0');
+                }, 400);
+            }
+
+            // Update memory state
+            auctionState.currentPrice = updatedAuction.currentPrice;
 
             const errorText = document.getElementById(`error-${auctionId}`);
             if(errorText) errorText.classList.add('hidden');
@@ -119,6 +196,8 @@
                     const error = await response.json();
                     errorText.innerText = error.detail || "Error placing bid";
                     errorText.classList.remove('hidden');
+                } else {
+                    showSuccessToast(`Bid of $${amount} placed successfully!`);
                 }
             })
             .catch(err => {
@@ -142,18 +221,22 @@
 
                 if (diff <= 0) {
                     timerEl.innerText = "SOLD!";
-                    timerEl.className = "text-xl font-black text-red-600 mb-4 tracking-widest";
+                    timerEl.className = "text-xl font-black text-red-600 mb-4 tracking-widest transition-all duration-500";
 
                     if (btnEl && !btnEl.disabled) {
                         btnEl.disabled = true;
                         btnEl.innerText = "Closed";
-                        btnEl.className = "w-1/4 bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-not-allowed";
+                        btnEl.className = "w-1/4 bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-not-allowed transition-all duration-500";
 
                         usernameEl.disabled = true;
                         usernameEl.className = "w-1/2 px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed";
 
                         amountEl.disabled = true;
                         amountEl.className = "w-1/4 px-3 py-2 border rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed";
+
+                        // Remove halo if time runs out
+                        const cardElement = document.getElementById(`card-${id}`);
+                        if(cardElement) cardElement.classList.remove('ring-4', 'ring-yellow-400', 'border-transparent');
                     }
 
                     delete activeAuctions[id];
@@ -161,7 +244,7 @@
                     const seconds = Math.floor((diff / 1000) % 60);
                     const minutes = Math.floor((diff / 1000 / 60) % 60);
 
-                    if (diff < 15000) { // < 15 seconds
+                    if (diff < 15000) {
                         timerEl.innerText = `⏳ Deal closing soon: 0${minutes}:${seconds.toString().padStart(2, '0')}`;
                         timerEl.classList.add("text-red-500");
                     } else {
@@ -175,6 +258,60 @@
 
         requestAnimationFrame(updateClocks);
     }
+
+    function showFraudToast(message) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'bg-red-600 text-white px-6 py-3 rounded shadow-lg transform transition-all duration-300 translate-y-10 opacity-0 flex items-center gap-3 pointer-events-none';
+        toast.innerHTML = `
+        <span class="text-xl">🚨</span>
+        <div class="flex flex-col">
+            <span class="font-bold">Bid Rejected</span>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+
+        container.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-10', 'opacity-0');
+        });
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    function showSuccessToast(message) {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'bg-green-600 text-white px-6 py-3 rounded shadow-lg transform transition-all duration-300 translate-y-10 opacity-0 flex items-center gap-3 pointer-events-none';
+        toast.innerHTML = `
+        <span class="text-xl">✅</span>
+        <div class="flex flex-col">
+            <span class="font-bold">Success</span>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+
+        container.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-10', 'opacity-0');
+        });
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
 </script>
+
+<div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 </body>
 </html>

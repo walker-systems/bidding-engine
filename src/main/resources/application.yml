@@ -1,6 +1,9 @@
 spring:
   application:
     name: bidding-engine
+  docker:
+    compose:
+      file: ../docker-compose.yml
 
   # 1. Redis Configuration
   data:
