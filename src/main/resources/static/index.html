@@ -36,9 +36,8 @@
 <script>
     const activeAuctions = {};
     let clockInterval;
-    let isChaosRunning = false; // Track the bot state
+    let isChaosRunning = false;
 
-    // NEW: Dictionary to track the active toast timers for each card!
     const toastTimers = {};
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -289,12 +288,10 @@
         }
     }
 
-    // THE NEW SMART TOAST LOGIC
     function showCardToast(auctionId, message, colorClass) {
         const area = document.getElementById(`toast-area-${auctionId}`);
         if (!area) return;
 
-        // 1. Clear any existing timers for this specific card
         if (toastTimers[auctionId]) {
             clearTimeout(toastTimers[auctionId].fadeTimer);
             clearTimeout(toastTimers[auctionId].removeTimer);
@@ -302,26 +299,21 @@
             toastTimers[auctionId] = {};
         }
 
-        // 2. Try to find an existing toast. If it doesn't exist, create it.
         let toast = area.querySelector('.custom-toast');
         if (!toast) {
             toast = document.createElement('div');
             area.appendChild(toast);
         }
 
-        // 3. Update the text and completely overwrite the class to ensure colors swap smoothly
         toast.className = `custom-toast ${colorClass} text-white px-6 py-2 rounded-full shadow-2xl transform transition-all duration-300 scale-100 opacity-100 mb-2 font-bold absolute`;
         toast.innerText = message;
 
-        // Force a reflow so the browser knows we reset it
         void toast.offsetWidth;
 
-        // 4. Set the new fade-out timer (This will get reset if they click again within 2 seconds!)
         toastTimers[auctionId].fadeTimer = setTimeout(() => {
             toast.classList.remove('scale-100', 'opacity-100');
             toast.classList.add('scale-110', 'opacity-0');
 
-            // Wait for the CSS transition to finish before removing from DOM
             toastTimers[auctionId].removeTimer = setTimeout(() => {
                 toast.remove();
                 delete toastTimers[auctionId];
