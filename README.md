@@ -29,3 +29,12 @@ docker compose up -d
 
 # 2. Run Application
 ./mvnw spring-boot:run
+```
+---
+
+## 📬 Let's Connect
+
+**Justin Walker**
+* 📧 **Email:** [justinwalker.contact@gmail.com](mailto:justinwalker.contact@gmail.com)
+* 💼 **LinkedIn:** [Justin Walker](https://www.linkedin.com/in/justin-walker-0403923b1/)
+* 🌐 **Portfolio:** [justin-castillo.github.io](https://justin-castillo.github.io/)
