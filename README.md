@@ -1,35 +1,34 @@
-# ⚡ Bidding Engine
+# 🛒 Bidding Engine (Core Storefront)
 
-[![Java 25](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/projects/jdk/25/)
-[![Spring Boot 4](https://img.shields.io/badge/Spring_Boot-4.0-green)](https://spring.io/projects/spring-boot)
-[![Redis Reactive](https://img.shields.io/badge/Redis-Reactive-red)](https://redis.io/)
+*Note: This is a microservice within the larger **[Real-Time Bidding & Fraud Detection Platform](https://github.com/walker-systems/auction-system)**. For the full system architecture and Docker orchestration, please visit the main repository.*
 
-**A High-Frequency, Event-Driven Auction System.**
+This is the user-facing storefront and the core transaction engine of the auction platform. It handles incoming bids, manages the active countdown timers, and instantly broadcasts updates to all connected users.
 
-The Bidding Engine is a reactive microservice designed to handle concurrent bids with sub-millisecond latency. It leverages **Redis Streams** for event propagation and **Optimistic Locking (CAS)** to ensure data integrity during high-traffic auction closings.
+## 🧠 Component Context
 
-## 🚀 Key Features
-* **Reactive Core:** Built on Spring WebFlux (Netty) for non-blocking I/O.
-* **Race Condition Handling:** Uses Redis `WATCH/MULTI/EXEC` patterns to prevent double-spending.
-* **AI Integration:** Emits real-time events for Price Prediction models (via MCP).
-* **Vector Search:** Uses Redis Search to find similar auctions by semantic embedding.
+Unlike traditional web apps that force you to refresh the page to see new bids, this engine uses **Server-Sent Events (SSE)**. 
 
-## 🛠️ Tech Stack
-| Component | Technology                                  |
-| :--- |:--------------------------------------------|
-| **Language** | Java 25 (Record Patterns, Reactive Streams) |
-| **Framework** | Spring Boot 4.0 (WebFlux)                   |
-| **Database** | Redis Stack (JSON + Search + Streams)       |
-| **Testing** | Testcontainers + JUnit 5                    |
+When a user places a bid, the Bidding Engine saves it and broadcasts it to Redis. It then immediately pushes that new price out to every open browser tab in milliseconds, creating a truly live auction experience. 
 
-## 🏃‍♂️ Quick Start
+**Key Technologies:** Java 25, Spring Boot WebFlux, Server-Sent Events (SSE), Vanilla JavaScript, TailwindCSS.
+
+---
+
+## 🚀 How to Run (Standalone)
+
+*To run the full platform including the AI Sentinel and Database, use the `docker-compose.yml` in the [main repository](https://github.com/walker-systems/auction-system).*
+
+If you want to run just this service locally (requires a running Redis instance on port 6379):
+
 ```bash
-# 1. Start Infrastructure (Redis Stack)
-docker compose up -d
+# 1. Navigate to this directory
+cd bidding-engine
 
-# 2. Run Application
+# 2. Start the application
 ./mvnw spring-boot:run
 ```
+The storefront will be available at: **`http://localhost:8080`**
+
 ---
 
 ## 📬 Let's Connect
