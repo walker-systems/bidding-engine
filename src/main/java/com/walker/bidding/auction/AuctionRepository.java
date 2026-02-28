@@ -11,6 +11,8 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
+import static reactor.netty.http.HttpConnectionLiveness.log;
+
 @Repository
 @RequiredArgsConstructor
 public class AuctionRepository {
@@ -72,5 +74,13 @@ public class AuctionRepository {
         // Find all keys starting with "auctions:", then fetch the value for each key
         return template.keys("auctions:*")
                 .flatMap(key -> template.opsForValue().get(key));
+    }
+
+    public Mono<Void> deleteAll() {
+        log.info("🗑️ Sweeping the database clean...");
+        // Find all keys that start with "auctions:" and delete them
+        return template.keys("auctions:*")
+                .flatMap(template::delete)
+                .then();
     }
 }
